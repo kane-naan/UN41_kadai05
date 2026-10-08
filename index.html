@@ -23,7 +23,7 @@
         獲得コイン: <span id="coin-count" style="color: red;">0</span> 枚
       </div>
 
-      <!-- ★SpawnCoinボタンの追加 -->
+      <!-- SpawnCoinボタンの追加 -->
       <div style="text-align: center; margin-bottom: 15px;">
         <button id="spawn-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
           コインを生成 (SpawnCoin)
@@ -36,8 +36,8 @@
         <div id="unity-build-title">My project (5)</div>
       </div>
     </div>
-    <script>
 
+    <script>
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
@@ -45,7 +45,7 @@
       var fullscreenButton = document.querySelector("#unity-fullscreen-button");
       var warningBanner = document.querySelector("#unity-warning");
 
-      // ★Unityインスタンスを保持する変数を定義
+      // Unityインスタンスを保持する変数を定義
       var myUnityInstance = null;
 
       function unityShowBanner(msg, type) {
@@ -99,7 +99,6 @@
         createUnityInstance(canvas, config, (progress) => {
           progressBarFull.style.width = 100 * progress + "%";
         }).then((unityInstance) => {
-          // ★生成されたインスタンスを変数に保存
           myUnityInstance = unityInstance;
 
           loadingBar.style.display = "none";
@@ -116,13 +115,77 @@
       // ボタンが押されたときにUnityへメッセージを送信する処理
       document.getElementById("spawn-btn").onclick = function() {
         if (myUnityInstance) {
-          // 書き方: myUnityInstance.SendMessage('ヒエラルキー上のGameObject名', '実行するメソッド名');
-          // ※GameObjectの名前が "CoinSpawner" の場合の例です
           myUnityInstance.SendMessage("CoinManager", "SpawnCoin");
         } else {
           console.log("Unityのロードが完了していません。");
         }
       };
+
+      // -------------------------------------------------------------
+      // ★ ここから追記：タッチ操作による移動方向の取得とUnity連携
+      // -------------------------------------------------------------
+      var moveDirection = { x: 0, y: 0 };
+      var isTouching = false;
+
+      // タッチ開始
+      canvas.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        isTouching = true;
+        updateMoveDirection(e.touches[0]);
+      }, { passive: false });
+
+      // タッチ移動
+      canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        if (isTouching) {
+          updateMoveDirection(e.touches[0]);
+        }
+      }, { passive: false });
+
+      // タッチ終了
+      function handleTouchEnd(e) {
+        e.preventDefault();
+        isTouching = false;
+        moveDirection = { x: 0, y: 0 };
+        sendDirectionToUnity(0, 0); // 指を離したら停止
+      }
+
+      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+      canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+      // タッチ位置とキャンバス中心の差分から移動方向（正規化）を求める
+      function updateMoveDirection(touch) {
+        var rect = canvas.getBoundingClientRect();
+        var touchX = touch.clientX - rect.left;
+        var touchY = touch.clientY - rect.top;
+
+        var centerX = rect.width / 2;
+        var centerY = rect.height / 2;
+
+        var dx = touchX - centerX;
+        var dy = touchY - centerY;
+        var distance = Math.hypot(dx, dy);
+
+        if (distance > 0) {
+          // Y軸は画面座標（下がプラス）と3D空間（奥がプラス）で反転するため -dy にします
+          moveDirection.x = dx / distance;
+          moveDirection.y = -dy / distance;
+        } else {
+          moveDirection.x = 0;
+          moveDirection.y = 0;
+        }
+
+        // Unityに移動方向データを送信
+        sendDirectionToUnity(moveDirection.x, moveDirection.y);
+      }
+
+      // Unity側のスクリプトに「X,Y」を文字列として送る関数
+      function sendDirectionToUnity(x, y) {
+        if (myUnityInstance) {
+          // ※例: Playerオブジェクトの SetTouchInput メソッドを呼び出す場合
+          myUnityInstance.SendMessage("Player", "SetTouchInput", x + "," + y);
+        }
+      }
 
     </script>
   </body>
